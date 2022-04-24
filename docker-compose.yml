@@ -1,0 +1,45 @@
+version: '3.1'
+services:
+  db:
+    image: "postgres:14.1-alpine"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: price
+    ports:
+      - 54321:5432
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./price-backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+  databus:
+    restart: always
+    image: "nats:alpine3.15"
+    ports:
+        - "4222:4222"
+  price-backend:
+    build: ./price-backend
+    restart: always
+    environment:
+      NATS_HOST: "nats://databus"
+      NATS_PORT: "4222"
+      SERVICE_NAME: "price-backend"
+      API_BASE_URL: "https://min-api.cryptocompare.com"
+    depends_on:
+      - "databus"
+      - "db"
+  forex-backend:
+    build: ./forex-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      HTTP_PORT: 8080
+      NATS_HOST: "nats://databus"
+      NATS_PORT: "4222"
+    depends_on:
+      - "databus"
+      - "db"
+volumes:
+  db:
+    driver: local
